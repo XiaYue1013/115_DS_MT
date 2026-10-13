@@ -1,4 +1,4 @@
-"""第 17 題：自動登入 GitHub、完成 TOTP，抓題目指定的兩張卡片。"""
+"""第 17 題：登入 GitHub，擷取新版首頁與 Feed 對應區塊。"""
 
 import os
 import time
@@ -143,37 +143,38 @@ def ensure_login(driver, username, password, generator):
         raise RuntimeError(f"GitHub 登入或驗證尚未完成，目前頁面路徑：{location}") from None
 
 
-def read_required_areas(driver):
-    """只擷取原題卡片；缺少卡片時回報，不退回整個 aside/main。"""
+def read_project_section(driver, title):
+    """擷取新版導覽列的專案區標題與可見 repository 連結。"""
     return driver.execute_script(r"""
-        const normalize = text => (text || '').replace(/\s+/g, ' ').trim();
-        const visible = element => element.getClientRects().length && getComputedStyle(element).visibility !== 'hidden';
-        const heading = title => Array.from(document.querySelectorAll('h1,h2,h3,h4,h5,h6,[role=heading],strong,p,span,div'))
-            .find(element => visible(element) && normalize(element.textContent) === title &&
-                !Array.from(element.children).some(child => normalize(child.textContent) === title));
-        const first = heading('Create your first project');
-        let intro = null;
-        for (let parent = first?.parentElement; parent && !['MAIN','ASIDE','BODY','HTML'].includes(parent.tagName); parent = parent.parentElement) {
-            intro = Array.from(parent.querySelectorAll('p,div,span')).find(element =>
-                visible(element) && normalize(element.textContent).startsWith('Ready to start building?') &&
-                !Array.from(element.children).some(child => normalize(child.textContent).startsWith('Ready to start building?')));
-            if (intro) break;
+        const title = arguments[0];
+        const visible = e => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
+        const norm = s => (s || '').replace(/\s+/g, ' ').trim();
+        const heading = [...document.querySelectorAll('h1,h2,h3,h4,[role=heading]')]
+            .find(e => visible(e) && norm(e.innerText) === title);
+        if (!heading) return null;
+        let root = heading;
+        while (root.parentElement && root.querySelectorAll('a[href]').length < 1 && root.tagName !== 'NAV') root = root.parentElement;
+        const repos = [...root.querySelectorAll('a[href]')].filter(a => visible(a) && /^https:\/\/github\.com\/[^/]+\/[^/?#]+\/?$/.test(a.href));
+        return {title, repos: repos.map(a => ({name:norm(a.innerText), url:a.href}))};
+    """, title)
+
+
+def read_trending_section(driver):
+    """擷取 Feed「Trending repositories」區塊中的 repository 與卡片文字。"""
+    return driver.execute_script(r"""
+        const visible = e => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
+        const norm = s => (s || '').replace(/\s+/g, ' ').trim();
+        const main = document.querySelector('main');
+        if (!main || !norm(main.innerText).includes('Trending repositories')) return null;
+        const links = [...main.querySelectorAll('a[href]')].filter(a => visible(a) && /^https:\/\/github\.com\/[^/]+\/[^/?#]+\/?$/.test(a.href));
+        const unique = new Map();
+        for (const a of links) {
+            if (unique.has(a.href)) continue;
+            let card = a;
+            while (card.parentElement && card.parentElement !== main && norm(card.innerText).length < 100) card = card.parentElement;
+            unique.set(a.href, {name:norm(a.innerText), url:a.href, detail:norm(card.innerText)});
         }
-        const second = heading('Updates to your homepage feed');
-        let feedIntro = null;
-        let learnMore = null;
-        for (let parent = second?.parentElement; parent && !['MAIN','ASIDE','BODY','HTML'].includes(parent.tagName); parent = parent.parentElement) {
-            feedIntro = Array.from(parent.querySelectorAll('p,div,span')).find(element =>
-                visible(element) && /^We['’]ve combined/.test(normalize(element.textContent)) &&
-                !Array.from(element.children).some(child => /^We['’]ve combined/.test(normalize(child.textContent))));
-            learnMore = Array.from(parent.querySelectorAll('a')).find(element =>
-                visible(element) && normalize(element.textContent) === 'Learn more');
-            if (feedIntro && learnMore) break;
-        }
-        return {
-            area1: first && intro ? first.innerText + '\n' + intro.innerText : null,
-            area2: second && feedIntro && learnMore ? second.innerText + '\n' + feedIntro.innerText + '\n' + learnMore.innerText : null,
-        };
+        return {title:'Trending repositories', repos:[...unique.values()]};
     """)
 
 
@@ -184,40 +185,37 @@ def main():
     try:
         ensure_login(driver, username, password, generator)
         WebDriverWait(driver, 40).until(lambda d: dashboard_loaded(d, username))
+        home_url = "https://github.com/"
         driver.save_screenshot(str(OUTPUT_DIR / "q17_login.png"))
-
-        def areas_ready(current_driver):
-            result = read_required_areas(current_driver)
-            return result if all(result.values()) else False
-
-        def wait_for_areas():
-            try:
-                return WebDriverWait(driver, 30).until(areas_ready)
-            except TimeoutException:
-                return read_required_areas(driver)
-
-        areas = wait_for_areas()
-        if not all(areas.values()):
-            # 新版首頁與 Feed 分開；只使用網站提供的同站 Feed 連結。
-            feed_url = driver.execute_script("return Array.from(document.querySelectorAll('a')).find(e => e.innerText.trim() === 'Feed' && e.getClientRects().length)?.href || null")
-            if feed_url and urlparse(feed_url).netloc == "github.com" and urlparse(feed_url).path == "/feed":
-                print("首頁未找到原題卡片，檢查網站的 Feed 頁。")
-                driver.get(feed_url)
-                areas = wait_for_areas()
-        if not all(areas.values()):
-            missing = [str(index) for index, value in enumerate(areas.values(), 1) if not value]
-            raise RuntimeError(f"GitHub Dashboard 缺少原題第 {'、'.join(missing)} 個紅框卡片，可能已改版或該帳號已關閉卡片；需核對畫面，不能用整個頁面代替。") from None
-        rows = []
-        for index in (1, 2):
-            lines = clean_lines(areas[f"area{index}"])
-            rows.append([{"序號": i, "內容": line, "來源頁": driver.current_url} for i, line in enumerate(lines, 1)])
-        save_csv("github_area1.csv", rows[0])
-        save_csv("github_area2.csv", rows[1])
+        WebDriverWait(driver, 30).until(lambda d: read_project_section(d, "Top repositories") is not None)
+        project = read_project_section(driver, "Top repositories")
+        if not project["repos"]:
+            raise RuntimeError("GitHub 首頁 Top repositories 區塊目前沒有可見 repository。")
+        home_rows = [{"區塊": project["title"], "序號": 1, "內容": project["title"], "網址": "", "來源頁": home_url}]
+        home_rows.extend({"區塊": project["title"], "序號": i, "內容": repo["name"], "網址": repo["url"], "來源頁": home_url}
+                         for i, repo in enumerate(project["repos"], 2))
         driver.execute_script("window.scrollTo(0, 0)")
+        driver.save_screenshot(str(OUTPUT_DIR / "q17_area1.png"))
+
+        feed_url = "https://github.com/feed"
+        driver.get(feed_url)
+        WebDriverWait(driver, 40).until(lambda d: read_trending_section(d) is not None)
+        trending = read_trending_section(driver)
+        if not trending["repos"]:
+            raise RuntimeError("GitHub Feed 顯示 Trending repositories，但目前沒有可見專案資料。")
+        feed_rows = [{"區塊": trending["title"], "序號": 1, "內容": trending["title"], "網址": "", "來源頁": feed_url}]
+        for i, repo in enumerate(trending["repos"], 2):
+            feed_rows.append({"區塊": trending["title"], "序號": i, "內容": repo["name"], "網址": repo["url"], "來源頁": feed_url})
+            if repo["detail"] and repo["detail"] != repo["name"]:
+                feed_rows.append({"區塊": trending["title"], "序號": i, "內容": repo["detail"], "網址": repo["url"], "來源頁": feed_url})
+        save_csv("github_area1.csv", home_rows)
+        save_csv("github_area2.csv", feed_rows)
+        driver.execute_script("window.scrollTo(0, 0)")
+        driver.save_screenshot(str(OUTPUT_DIR / "q17_area2.png"))
         driver.save_screenshot(str(OUTPUT_DIR / "q17.png"))
         for stale in ("q17_verification.png", "q17_failure.png", "github_dashboard.html"):
             (OUTPUT_DIR / stale).unlink(missing_ok=True)
-        print(f"Q17 完成：區域 1 共 {len(rows[0])} 行，區域 2 共 {len(rows[1])} 行")
+        print(f"Q17 完成：Top repositories {len(home_rows) - 1} 個，Trending repositories {len(trending['repos'])} 個")
     except Exception:
         # 不保存登入頁 HTML，避免帳密、TOTP 或驗證欄位落入檔案。
         try:
