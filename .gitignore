@@ -1,0 +1,57 @@
+# 本機帳密；只保留不含真實帳密的設定範本
+.env
+.env.*
+!.env.example
+
+# Python 虛擬環境、編譯及套件快取
+.venv*/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.cache/
+
+# 本機驗證、測試紀錄與暫存
+/verification/
+/tests/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.log
+*.tmp
+
+# 各題執行結果與產生的交付文件
+/Q[0-9][0-9]/output/
+output/
+/submission/
+/build_report.py
+# 截圖與報告即使放在其他位置，也不納入提交
+*.png
+*.jpg
+*.jpeg
+*.ppt
+*.pptx
+*.pptm
+*.pps
+*.ppsx
+*.doc
+*.docx
+*.docm
+
+# 瀏覽器登入資料及下載快取
+.browser-profile/
+.browser-cache/
+.selenium-cache/
+
+# 作業系統與編輯器本機設定
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo

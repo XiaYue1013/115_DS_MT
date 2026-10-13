@@ -1,0 +1,7 @@
+beautifulsoup4>=4.12
+lxml>=5.0
+requests>=2.31
+selenium>=4.18
+certifi>=2023.5.7
+tzdata>=2024.1
+pyotp>=2.9,<3

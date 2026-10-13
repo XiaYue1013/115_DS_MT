@@ -1,0 +1,37 @@
+from __future__ import annotations
+
+import csv
+import os
+from pathlib import Path
+
+OUTPUT_DIR = Path(__file__).resolve().parent / "output"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def save_csv(filename: str, rows: list[dict], fieldnames: list[str] | None = None):
+    if not rows:
+        raise RuntimeError(f"沒有資料可寫入 {filename}")
+    path = OUTPUT_DIR / filename
+    fields = fieldnames or list(rows[0].keys())
+    with path.open("w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(rows)
+    print(f"已儲存 {len(rows)} 筆：{path}")
+    return path
+
+
+def new_driver():
+    from selenium import webdriver
+    from selenium.webdriver.chrome.service import Service
+
+    options = webdriver.ChromeOptions()
+    if os.getenv("HEADLESS") == "1":
+        options.add_argument("--headless=new")
+    if os.getenv("CHROME_BINARY"):
+        options.binary_location = os.environ["CHROME_BINARY"]
+    options.add_argument("--window-size=1440,1000")
+    options.add_argument("--lang=zh-TW")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    service = Service(executable_path=os.environ["CHROMEDRIVER"]) if os.getenv("CHROMEDRIVER") else Service()
+    return webdriver.Chrome(service=service, options=options)
