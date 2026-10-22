@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parent
 TIMEOUT = 600
 
 env = dict(os.environ, PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8")
-env.setdefault("HEADLESS", "1")
+# Windows、macOS 預設有頭；Linux 預設無頭（由各題 common.py 依平台決定，可用 HEADLESS 覆蓋）
 
 wanted = {int(a) for a in sys.argv[1:]} or set(range(1, 18))
 results = []

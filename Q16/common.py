@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import os
+import sys
 from pathlib import Path
 
 import requests
@@ -49,7 +50,7 @@ def new_driver(profile_dir=None):
         profile_dir = Path(profile_dir).resolve()
         profile_dir.mkdir(parents=True, exist_ok=True)
         options.add_argument(f"--user-data-dir={profile_dir}")
-    if os.getenv("HEADLESS") == "1":
+    if os.getenv("HEADLESS", "1" if sys.platform.startswith("linux") else "0") == "1":
         options.add_argument("--headless=new")
         options.add_argument(f"user-agent={HEADERS['User-Agent']}")
     if os.getenv("CHROME_BINARY"):

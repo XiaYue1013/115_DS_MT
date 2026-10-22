@@ -63,7 +63,7 @@ clone 後直接執行，腳本會自動建立虛擬環境、安裝套件、必�
 | Windows PowerShell | `.\run_all.ps1` |
 | Windows cmd（或雙擊） | `run_all.bat` |
 
-只跑部分題目時在後面加題號，例如 `./run_all.sh 1 5 17`。預設為無頭模式（`HEADLESS=1`），想看瀏覽器視窗請先將 `HEADLESS` 設為 `0`。第 7、17 題需先完成下方「設定」，否則該題會失敗，不影響其他題。
+只跑部分題目時在後面加題號，例如 `./run_all.sh 1 5 17`。Windows、macOS 預設開啟可見瀏覽器，Linux 預設無頭；可用環境變數 `HEADLESS=1`（無頭）或 `HEADLESS=0`（有頭）覆蓋。第 7、17 題需先完成下方「設定」，否則該題會失敗，不影響其他題。
 
 ## 設定
 

@@ -2,10 +2,12 @@
 
 import os
 import time
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
 import pyotp
+import requests
 from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -28,6 +30,23 @@ def load_test_credentials():
             if separator and key in CONFIG_KEYS:
                 values[key] = value.strip().strip("\"'")
     return tuple(os.environ.get(key, values.get(key)) for key in CONFIG_KEYS)
+
+
+def clock_offset():
+    """以 GitHub 回應標頭的 Date 校正本機時鐘（學校電腦時間常不準）；失敗時不校正。"""
+    try:
+        before = time.time()
+        response = requests.head("https://github.com/", timeout=10)
+        server_time = parsedate_to_datetime(response.headers["Date"]).timestamp()
+        offset = server_time - (before + time.time()) / 2
+    except Exception:
+        return 0.0
+    if abs(offset) > 2:
+        print(f"本機時間與標準時間相差約 {offset:+.0f} 秒，TOTP 將以校正後的時間計算。")
+    return offset
+
+
+CLOCK_OFFSET = clock_offset()
 
 
 def make_totp(secret):
@@ -80,7 +99,7 @@ class TotpLogin:
             return
         if self.generator is None:
             raise RuntimeError("GitHub 已要求 TOTP；請在專案 .env 加入 GITHUB_TOTP_SECRET（setup key）後重跑。")
-        now = time.time()
+        now = time.time() + CLOCK_OFFSET
         step = int(now // self.generator.interval)
         if step in self.submitted_steps:
             return
