@@ -51,6 +51,7 @@ def new_driver(profile_dir=None):
         options.add_argument(f"--user-data-dir={profile_dir}")
     if os.getenv("HEADLESS") == "1":
         options.add_argument("--headless=new")
+        options.add_argument(f"user-agent={HEADERS['User-Agent']}")
     if os.getenv("DISABLE_JAVASCRIPT") == "1":
         options.add_argument("--disable-javascript")
         options.add_argument(

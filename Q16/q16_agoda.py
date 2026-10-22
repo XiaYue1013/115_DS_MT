@@ -26,6 +26,13 @@ def source_url(url):
     return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(params), ""))
 
 
+def safe_click(driver, element):
+    try:
+        element.click()
+    except Exception:
+        driver.execute_script("arguments[0].click();", element)
+
+
 def select_dates(driver, check_in, check_out):
     """只點選可見日期，並確認網站狀態已實際更新。"""
     for index, target in enumerate((check_in, check_out)):
@@ -39,7 +46,7 @@ def select_dates(driver, check_in, check_out):
                 date_box = WebDriverWait(driver, 20).until(
                     lambda d: first(d, ["#check-in-box" if index == 0 else "#check-out-box"])
                 )
-                date_box.click()
+                safe_click(driver, date_box)
                 try:
                     WebDriverWait(driver, 5).until(lambda d: first(d, ["[data-selenium-date]"]))
                     break
@@ -54,12 +61,12 @@ def select_dates(driver, check_in, check_out):
             next_month = first(driver, ["[data-selenium='calendar-next-month-button']"])
             if not next_month or not next_month.is_enabled():
                 raise RuntimeError(f"Agoda 行事曆找不到 {target:%Y-%m-%d}")
-            next_month.click()
+            safe_click(driver, next_month)
             time.sleep(0.5)
         else:
             raise RuntimeError("Agoda 行事曆無法定位指定月份")
         button = day.find_element(By.XPATH, "./ancestor::*[@role='button'][1]")
-        button.click()
+        safe_click(driver, button)
         field = "checkInBox" if index == 0 else "checkOutBox"
         WebDriverWait(driver, 15).until(
             lambda d: d.find_element(By.CSS_SELECTOR, f"[data-selenium='{field}']").get_attribute("data-date") == f"{target:%Y-%m-%d}"
@@ -78,35 +85,48 @@ def first(driver, selectors):
     return None
 
 
+JS_EXTRACT = """
+const rows = [];
+const nameElements = document.querySelectorAll("[data-selenium='hotel-name'], [data-testid='property-name'], .PropertyCard__HotelName");
+for (const nameEl of nameElements) {
+    const hotelName = nameEl.innerText.trim();
+    if (!hotelName) continue;
+    let card = nameEl;
+    for (let i = 0; i < 8; i++) {
+        if (!card.parentElement) break;
+        card = card.parentElement;
+        if (card.querySelectorAll("[data-selenium='hotel-name'], [data-testid='property-name'], .PropertyCard__HotelName").length > 1) {
+            break;
+        }
+        const prices = card.querySelectorAll("[data-selenium='display-price'], [data-selenium='price-display'], [data-element-name='final-price'], [data-testid='price'], .Price__Value");
+        const priceVals = [...prices].map(p => p.innerText.trim()).filter(p => /\\d/.test(p));
+        if (priceVals.length > 0) {
+            rows.push({name: hotelName, price: priceVals[priceVals.length - 1]});
+            break;
+        }
+    }
+}
+return rows;
+"""
+
+
 def result_rows(driver, check_in, check_out):
     """僅解析搜尋結果中的住宿卡；沒有價格的卡片不當作完整結果。"""
-    names = driver.find_elements(By.CSS_SELECTOR,
-        "[data-selenium='hotel-name'], [data-testid='property-name'], .PropertyCard__HotelName")
-    rows = []
-    for node in names:
-        try:
-            hotel_name = node.text.strip()
-            if not hotel_name:
-                continue
-            card = node
-            for _ in range(8):
-                card = card.find_element(By.XPATH, "..")
-                if len(card.find_elements(By.CSS_SELECTOR,
-                    "[data-selenium='hotel-name'], [data-testid='property-name'], .PropertyCard__HotelName")) > 1:
-                    break
-                prices = card.find_elements(By.CSS_SELECTOR,
-                    "[data-selenium='display-price'], [data-selenium='price-display'], "
-                    "[data-element-name='final-price'], [data-testid='price'], .Price__Value")
-                values = [price.text.strip() for price in prices if price.is_displayed()]
-                values = [value for value in values if re.search(r"\d", value)]
-                if values:
-                    rows.append({"飯店名": hotel_name, "價格": values[-1],
-                                 "入住日": f"{check_in:%Y-%m-%d}", "退房日": f"{check_out:%Y-%m-%d}",
-                                 "資料來源": source_url(driver.current_url)})
-                    break
-        except (NoSuchElementException, StaleElementReferenceException):
-            continue
-    return rows
+    try:
+        items = driver.execute_script(JS_EXTRACT)
+    except Exception:
+        items = []
+    source = source_url(driver.current_url)
+    return [
+        {
+            "飯店名": item["name"],
+            "價格": item["price"],
+            "入住日": f"{check_in:%Y-%m-%d}",
+            "退房日": f"{check_out:%Y-%m-%d}",
+            "資料來源": source,
+        }
+        for item in items
+    ]
 
 
 def search_hotels(driver, check_in, check_out):
@@ -114,17 +134,17 @@ def search_hotels(driver, check_in, check_out):
     hotel_tab = WebDriverWait(driver, 30).until(
         lambda d: first(d, ["button[data-element-name='all-rooms-tab']", "[data-element-name='hotel-home-tab']"])
     )
-    hotel_tab.click()
+    safe_click(driver, hotel_tab)
     box = WebDriverWait(driver, 30).until(
         lambda d: first(d, ["input[data-selenium='textInput']", "input[placeholder*='目的地']"])
     )
-    box.click()
+    safe_click(driver, box)
     box.clear()
     box.send_keys("台中")
     suggestion = WebDriverWait(driver, 25).until(
         lambda d: first(d, ["[data-testid='autosuggest-item']", "[data-selenium='autosuggest-item']", "li[role='option']"])
     )
-    suggestion.click()
+    safe_click(driver, suggestion)
     time.sleep(1)
     print("已選擇台中，開始操作行事曆。")
     select_dates(driver, check_in, check_out)
@@ -132,7 +152,7 @@ def search_hotels(driver, check_in, check_out):
         lambda d: first(d, ["button[data-element-name='search-button']", "[data-selenium='searchButton']"])
     )
     old_windows = set(driver.window_handles)
-    search_button.click()
+    safe_click(driver, search_button)
     WebDriverWait(driver, 30).until(
         lambda d: set(d.window_handles) != old_windows or "/search" in d.current_url
     )
@@ -157,7 +177,7 @@ def search_hotels(driver, check_in, check_out):
         print("搜尋結果尚未載入，重試同一個台中搜尋。")
         retry = first(driver, ["button[data-element-name='search-button']", "[data-selenium='searchButton']"])
         if retry is not None:
-            retry.click()
+            safe_click(driver, retry)
             time.sleep(3)
         else:
             driver.refresh()

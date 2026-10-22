@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import time
 
 import requests
 
@@ -31,11 +32,22 @@ def api_key():
 
 def fetch_page(key, start_index):
     params = {"q": "Python", "maxResults": 10, "projection": "lite", "startIndex": start_index, "key": key}
-    try:
-        response = requests.get(URL, params=params, timeout=30)
-    except requests.RequestException:
-        # requests 的例外會包含帶金鑰的完整網址，因此不顯示原始例外。
-        raise RuntimeError("Google Books API 連線失敗，請確認網路後重試。") from None
+    response = None
+    for attempt in range(4):
+        try:
+            response = requests.get(URL, params=params, timeout=30)
+            if response.status_code == 503 and attempt < 3:
+                time.sleep(1 + attempt)
+                continue
+            break
+        except requests.RequestException:
+            if attempt < 3:
+                time.sleep(1 + attempt)
+                continue
+            # requests 的例外會包含帶金鑰的完整網址，因此不顯示原始例外。
+            raise RuntimeError("Google Books API 連線失敗，請確認網路後重試。") from None
+    if response is None:
+        raise RuntimeError("Google Books API 連線失敗，請確認網路後重試。")
     try:
         data = response.json()
     except ValueError:

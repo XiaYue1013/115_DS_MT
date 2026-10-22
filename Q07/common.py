@@ -7,6 +7,15 @@ from pathlib import Path
 OUTPUT_DIR = Path(__file__).resolve().parent / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
 
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0 Safari/537.36"
+    ),
+    "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.7",
+}
+
 
 def save_csv(filename: str, rows: list[dict], fieldnames: list[str] | None = None):
     if not rows:
@@ -28,6 +37,7 @@ def new_driver():
     options = webdriver.ChromeOptions()
     if os.getenv("HEADLESS") == "1":
         options.add_argument("--headless=new")
+        options.add_argument(f"user-agent={HEADERS['User-Agent']}")
     if os.getenv("CHROME_BINARY"):
         options.binary_location = os.environ["CHROME_BINARY"]
     options.add_argument("--window-size=1440,1000")

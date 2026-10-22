@@ -47,6 +47,7 @@ def new_driver():
     options = webdriver.ChromeOptions()
     if os.getenv("HEADLESS") == "1":
         options.add_argument("--headless=new")
+        options.add_argument(f"user-agent={HEADERS['User-Agent']}")
     if os.getenv("CHROME_BINARY"):
         options.binary_location = os.environ["CHROME_BINARY"]
     options.add_argument("--window-size=1440,1000")

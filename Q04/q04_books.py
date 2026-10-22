@@ -130,7 +130,8 @@ def main():
         except requests.RequestException:
             pass
         if not rows:
-            driver = new_driver(profile_dir=PROFILE)
+            profile = None if os.getenv("HEADLESS") == "1" else PROFILE
+            driver = new_driver(profile_dir=profile)
             driver.get(URL)
             wait = int(os.getenv("BOOKS_WAIT_TIMEOUT", "120"))
             print(f"等待博客來原站商品資料；若有驗證請在瀏覽器完成，最多 {wait} 秒。")
@@ -151,7 +152,8 @@ def main():
             if row["作者"] and row["書價"]:
                 continue
             if driver is None:
-                driver = new_driver(profile_dir=PROFILE)
+                profile = None if os.getenv("HEADLESS") == "1" else PROFILE
+                driver = new_driver(profile_dir=profile)
             driver.get(row["網址"])
             try:
                 data = WebDriverWait(driver, 30).until(

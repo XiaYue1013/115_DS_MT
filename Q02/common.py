@@ -47,6 +47,7 @@ def new_driver():
     options = webdriver.ChromeOptions()
     if os.getenv("HEADLESS") == "1":
         options.add_argument("--headless=new")
+        options.add_argument(f"user-agent={HEADERS['User-Agent']}")
     if os.getenv("CHROME_NO_SANDBOX") == "1":
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
