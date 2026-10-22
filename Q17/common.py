@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import os
+import sys
 from pathlib import Path
 import tempfile
 
@@ -37,7 +38,7 @@ def new_driver(profile_dir=None):
 
     options = webdriver.ChromeOptions()
     cached_driver = None
-    if os.getenv("HEADLESS") == "1":
+    if os.getenv("HEADLESS", "1" if sys.platform.startswith("linux") else "0") == "1":
         options.add_argument("--headless=new")
         options.add_argument(f"user-agent={HEADERS['User-Agent']}")
     if os.getenv("CHROME_NO_SANDBOX") == "1":
