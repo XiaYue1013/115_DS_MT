@@ -49,10 +49,16 @@ def new_driver():
     if os.getenv("HEADLESS", "1" if sys.platform.startswith("linux") else "0") == "1":
         options.add_argument("--headless=new")
         options.add_argument(f"user-agent={HEADERS['User-Agent']}")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
     if os.getenv("CHROME_BINARY"):
         options.binary_location = os.environ["CHROME_BINARY"]
     options.add_argument("--window-size=1440,1000")
     options.add_argument("--lang=zh-TW")
     options.add_argument("--disable-blink-features=AutomationControlled")
+    options.page_load_strategy = "eager"
     service = Service(executable_path=os.environ["CHROMEDRIVER"]) if os.getenv("CHROMEDRIVER") else Service()
-    return webdriver.Chrome(service=service, options=options)
+    driver = webdriver.Chrome(service=service, options=options)
+    driver.set_page_load_timeout(60)
+    return driver

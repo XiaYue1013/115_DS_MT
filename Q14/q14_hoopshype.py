@@ -141,11 +141,11 @@ def main():
         rows = collect_all(driver)
         salary_field = next(key for key in rows[0] if "薪資" in key)
         rows.sort(key=lambda row: parse_salary(row[salary_field]), reverse=True)
+        save_csv("all_play.csv", rows)
         highest = []
         for row in rows[:3]:
             name, jersey = player_details(driver, row)
             highest.append({"名字": name, "背號": jersey, "薪資": row[salary_field], "資料來源": row["球員頁"]})
-        save_csv("all_play.csv", rows)
         save_csv("highest.csv", highest)
     finally:
         driver.quit()

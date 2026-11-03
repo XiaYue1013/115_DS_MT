@@ -1,5 +1,6 @@
 # Windows PowerShell：建立虛擬環境、安裝套件並一次跑完 Q01–Q17。用法：.\run_all.ps1 [題號...]
 Set-Location $PSScriptRoot
+$env:PYTHONIOENCODING = "utf-8"
 $venv = '.venv'
 $py = "$venv\Scripts\python.exe"
 if ((Test-Path $venv) -and -not (Test-Path $py)) { $venv = '.venv-win'; $py = "$venv\Scripts\python.exe" }
